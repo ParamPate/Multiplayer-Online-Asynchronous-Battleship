@@ -110,5 +110,67 @@ void process_msg(int index, char *msg) {
 
 
 int main(){
+    int port = 8080; 
+    int server_fd = make_listen_socket(port);
+    printf("Server listening on port %d\n", port);
+
+    struct pollfd fds[MAX_PLAYERS + 1];
+    fds[0].fd = server_fd;
+    fds[0].events = POLLIN;
+
+    for(int i = 0; i < MAX_PLAYERS; i++) {
+        players[i].fd = -1;
+        players[i].registered = 0;
+        fds[i + 1].fd = -1;
+        fds[i + 1].events = POLLIN;
+    }
+
+    while(1){
+        int poll_count = poll(fds, MAX_PLAYERS + 1, -1);
+        if(poll_count < 0) {
+            perror("poll");
+            exit(1);
+        }
+        if(fds[0].revents & POLLIN) { //new incoming clients
+            int client_fd = accept(server_fd, NULL, NULL);
+            if(client_fd >= 0){
+                int slot = -1; 
+                for(int i = 0; i < MAX_PLAYERS; i++) {
+                    if(players[i].fd == -1) {
+                        slot = i;
+                        break;
+                    }
+                }
+            }
+            if(slot != -1) {
+                players[slot].fd = client_fd;
+                fds[slot + 1].fd = client_fd;
+            } else {
+                char *msg = "SERVER FULL\n";
+                write(client_fd, msg, strlen(msg));
+                close(client_fd);
+            }
+
+    }
+
+    for(int i = 0; i < MAX_PLAYERS; i++) { //messages from clients
+        if(fds[i + 1].fd != -1 && (fds[i + 1].revents & POLLIN)) {
+            char buffer[MSG_BUF_SIZE];
+            memset(buffer, 0, sizeof(buffer));
+            int bytes_read = read(fds[i + 1].fd, buffer, sizeof(buffer), -1); 
+
+            if(bytes_read <= 0) {
+                close(players[i].fd);
+                disconnect_player(i);
+                players[i].fd = -1;
+                fds[i + 1].fd = -1;
+            }
+            else{
+                process_msg(i, buffer);
+            }
+        }
+    }
+    close(server_fd);
+    return 0;
 
 }
