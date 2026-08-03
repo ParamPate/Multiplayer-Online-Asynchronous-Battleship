@@ -1,11 +1,12 @@
-#include <"stdio.h">
-#include <"stdlib.h">
-#include <"NETWORK.h">
-#include <"NETWORK.c">
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include "network.h"
 
 int main(){
     int port = 8080;
-    int server_fd = make_listening_socket(port);
+    int server_fd = make_listen_socket(port);
     printf("Server is listening on port %d\n", port);
     printf("Test command: nc localhost %d\n", port);
     
