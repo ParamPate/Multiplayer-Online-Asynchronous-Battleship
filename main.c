@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/socket.h>
@@ -10,7 +11,7 @@
 #include "game.h"
 
 void send_msg(int fd, const char *msg) {
-    if(fd != -1) write(fd, msg, strlen(msg));
+    if(fd != -1) (void)write(fd, msg, strlen(msg));
 }
 
 void broadcast_msg(const char *msg) {
@@ -112,7 +113,7 @@ void process_msg(int index, char *msg) {
 
 int main(int argc, char *argv[]){
     signal(SIGPIPE, SIG_IGN);
-    
+
     if (argc != 2) {
         exit(1);
     }
@@ -154,7 +155,7 @@ int main(int argc, char *argv[]){
                     fds[slot + 1].fd = client_fd;
                 } else {
                     char *msg = "SERVER FULL\n";
-                    write(client_fd, msg, strlen(msg));
+                    (void)write(client_fd, msg, strlen(msg));
                     close(client_fd);
                 }
             }

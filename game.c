@@ -28,11 +28,11 @@ int player_add(int fd){
 
 int player_remove(int index){
     if(index < 0 || index >= MAX_PLAYERS) return -1;
-    
+        
+    close(players[index].fd);
     players[index].fd = -1;
     players[index].registered = 0;
     players[index].inlen = 0;
-    close(players[index].fd);
     return 0;       
 }
 
