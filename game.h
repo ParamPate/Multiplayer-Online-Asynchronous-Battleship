@@ -11,7 +11,7 @@
 typedef struct player {
     int fd; 
     int registered; 
-    int name [NAME_SIZE + 1];
+    char name [NAME_SIZE + 1];
     int sx[SHIPS_LEN];
     int sy[SHIPS_LEN];
     int hit[SHIPS_LEN];

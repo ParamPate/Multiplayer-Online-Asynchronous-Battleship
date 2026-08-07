@@ -36,7 +36,7 @@ void reg_command(int index, const char *msg) {
     char dir; 
 
     if(sscanf(msg, "REG %20s %d %d %c", name, &x, &y, &dir) != 4) {
-        send_msg(p->fd, "Invalid REG command format.\n");
+        send_msg(p->fd, "INVALID\n");
         return;
     }
     if(!valid_name(name)) {
@@ -61,6 +61,7 @@ void reg_command(int index, const char *msg) {
     memcpy(p->sy, oy, sizeof(oy));
     memset(p->hit, 0, sizeof(p->hit));
 
+    send_msg(p->fd, "WELCOME\n");
     char join_msg[MSG_OUT];
     snprintf(join_msg, sizeof(join_msg), "JOIN %s\n", p->name);
     broadcast_msg(join_msg);
@@ -109,11 +110,17 @@ void process_msg(int index, char *msg) {
 }
 
 
-int main(){
-    int port = 8080; 
+int main(int argc, char *argv[]){
+    signal(SIGPIPE, SIG_IGN);
+    
+    if (argc != 2) {
+        exit(1);
+    }
+
+    int port = atoi(argv[1]); 
+    
     int server_fd = make_listen_socket(port);
     printf("Server listening on port %d\n", port);
-
     struct pollfd fds[MAX_PLAYERS + 1];
     fds[0].fd = server_fd;
     fds[0].events = POLLIN;
@@ -141,35 +148,59 @@ int main(){
                         break;
                     }
                 }
-            }
-            if(slot != -1) {
-                players[slot].fd = client_fd;
-                fds[slot + 1].fd = client_fd;
-            } else {
-                char *msg = "SERVER FULL\n";
-                write(client_fd, msg, strlen(msg));
-                close(client_fd);
+            
+                if(slot != -1) {
+                    players[slot].fd = client_fd;
+                    fds[slot + 1].fd = client_fd;
+                } else {
+                    char *msg = "SERVER FULL\n";
+                    write(client_fd, msg, strlen(msg));
+                    close(client_fd);
+                }
             }
 
-    }
+        }
 
-    for(int i = 0; i < MAX_PLAYERS; i++) { //messages from clients
+for(int i = 0; i < MAX_PLAYERS; i++) { //messages from clients
         if(fds[i + 1].fd != -1 && (fds[i + 1].revents & POLLIN)) {
-            char buffer[MSG_BUF_SIZE];
-            memset(buffer, 0, sizeof(buffer));
-            int bytes_read = read(fds[i + 1].fd, buffer, sizeof(buffer), -1); 
+            Player *p = &players[i];
+            
+            int bytes_read = read(p->fd, p->inbuf + p->inlen, MSG_BUF_SIZE - p->inlen - 1); 
 
             if(bytes_read <= 0) {
-                close(players[i].fd);
+                close(p->fd);
                 disconnect_player(i);
-                players[i].fd = -1;
+                p->fd = -1;
                 fds[i + 1].fd = -1;
-            }
-            else{
-                process_msg(i, buffer);
+                p->inlen = 0; 
+            } else {
+                p->inlen += bytes_read;
+                p->inbuf[p->inlen] = '\0';
+                
+                char *newline_ptr;
+                while ((newline_ptr = strchr(p->inbuf, '\n')) != NULL) {
+                    *newline_ptr = '\0'; 
+                    
+                    process_msg(i, p->inbuf);
+                    
+                    int msg_len = (newline_ptr - p->inbuf) + 1;
+                    
+                    p->inlen -= msg_len;
+                    memmove(p->inbuf, newline_ptr + 1, p->inlen);
+                    p->inbuf[p->inlen] = '\0';
+                }
+                
+                if (p->inlen > 100) {
+                    close(p->fd);
+                    disconnect_player(i);
+                    p->fd = -1;
+                    fds[i + 1].fd = -1;
+                    p->inlen = 0;
+                }
             }
         }
     }
+}
     close(server_fd);
     return 0;
 
